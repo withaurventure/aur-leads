@@ -9,7 +9,8 @@ export async function renderTenders(ctx, _p, view, alive) {
   const tab = ctx.state.tenderTab;
   const now = enc(new Date().toISOString());
   const filter = {
-    open: `status=in.(new,watching,partner_bid,bidding)&or=(end_at.is.null,end_at.gt.${now})&order=end_at.asc.nullslast`,
+    open: `status=in.(new,watching,partner_bid,bidding)&and=(or(end_at.is.null,end_at.gt.${now}),or(fit_score.is.null,fit_score.gte.4))&order=fit_score.desc.nullslast,end_at.asc.nullslast`,
+    low: `status=eq.new&fit_score=lte.3&or=(end_at.is.null,end_at.gt.${now})&order=end_at.asc.nullslast`,
     mine: 'status=in.(watching,partner_bid,bidding,submitted)&order=end_at.asc.nullslast',
     results: 'or=(awarded_to.not.is.null,status.in.(won,lost,expired,skipped))&order=updated_at.desc',
   }[tab];
@@ -17,7 +18,7 @@ export async function renderTenders(ctx, _p, view, alive) {
   view.innerHTML = `
     <header class="page-head plain"><div class="page-head-text"><h1>Tenders</h1><small>AUR Printing Studio</small></div></header>
     <p class="info">Tenders arrive from your tender alert emails. Fit score looks at value, place, deadline and whether a new small business or startup may bid.</p>
-    <div class="chips">${seg('open', 'Open')}${seg('mine', 'Mine')}${seg('results', 'Results &amp; winners')}</div>
+    <div class="chips">${seg('open', 'Open')}${seg('mine', 'Mine')}${seg('results', 'Results &amp; winners')}${seg('low', 'Low fit')}</div>
     <div id="list">${loading()}</div>`;
   view.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { ctx.state.tenderTab = b.dataset.tab; ctx.rerender(); }; });
 
@@ -65,7 +66,7 @@ function card(t) {
       <label class="select-wrap"><span class="sr-only">Status</span>
         <select data-status="${t.id}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
       </label>
-      ${t.url ? `<a class="btn btn-primary" href="${esc(webLink(t.url))}" target="_blank" rel="noopener">Open documents</a>` : ''}
+      ${t.url || t.email_link ? `<a class="btn btn-primary" href="${esc(webLink(t.url || t.email_link))}" target="_blank" rel="noopener">${/mail\.google\./.test(t.url || t.email_link) ? 'Open alert email' : 'Open bid'}</a>` : ''}
     </div>
   </article>`;
 }
