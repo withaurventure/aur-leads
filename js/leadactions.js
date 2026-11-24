@@ -9,7 +9,7 @@ export async function updateLead(lead, patch, eventText) {
   await rest(`leads?id=eq.${enc(lead.id)}`, { method: 'PATCH', body: { ...patch, updated_at: new Date().toISOString() } });
   Object.assign(lead, patch);
   if (eventText) await logEvent(lead.id, 'you', eventText);
-  if ('status' in patch || 'phone' in patch || 'email' in patch || 'website' in patch || 'instagram' in patch || 'whatsapp' in patch) {
+  if ('status' in patch || 'phone' in patch || 'email' in patch || 'website' in patch || 'instagram' in patch || 'whatsapp' in patch || 'x_handle' in patch || 'telegram' in patch || 'linkedin' in patch) {
     await rpc('apply_rule_score', { p_id: lead.id }).catch(() => {});
   }
 }

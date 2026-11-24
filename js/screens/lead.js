@@ -4,10 +4,12 @@ import { rest, enc } from '../api.js';
 import { esc, icon, scoreChip, brandTags, STATUS, pageHeader, toast, confirmBox, timeAgo, fmtDate, dateInput, loading } from '../ui.js';
 import { telLink, waLink, mailLink, webLink, noteContact, setStatus, updateLead, logEvent } from '../leadactions.js';
 import { sendToDesk, DESK_URL } from '../handoff.js';
+import { cleanX, cleanTelegram } from '../quickadd.js';
 
 const EVENT_LABEL = { found: 'Found', contacts_found: 'Contacts found', new_instagram: 'Instagram found', new_website: 'Website found',
   website_down: 'Website down', rating_changed: 'Rating changed', reviews_up: 'More reviews', status_changed: 'Map listing changed',
-  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', you: 'You' };
+  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', hiring: 'Hiring', you: 'You' };
+const MARKETING_ROLE = /marketing|community|social media|content|growth|brand|\bkol\b|ambassador|\bpr\b|public relations|communications|creative|graphic design|visual design|video editor|influencer|go-to-market|\bgtm\b/i;
 
 export async function renderLead(ctx, { id }, view, alive) {
   view.innerHTML = pageHeader('Lead') + loading();
@@ -47,12 +49,17 @@ export async function renderLead(ctx, { id }, view, alive) {
       <ul class="checks">${reasons.map((r) => `<li>${icon('check')}<span>${esc(r)}</span></li>`).join('')}</ul>
     </section>` : ''}
 
+    ${hiringCard(l)}
+
     <section class="card contacts">
       ${contactRow('phone', 'Phone', l.phone, telLink(l), 'Call', 'Called', false)}
       ${contactRow('whatsapp', 'WhatsApp', l.whatsapp || l.phone, waLink(l), 'Chat', 'WhatsApp chat opened')}
       ${contactRow('mail', 'Email', l.email, mailLink(l), 'Mail', 'Email opened', false)}
       ${contactRow('globe', 'Website', l.website ? `${l.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}${l.website_ok === false ? ' (not working)' : ''}` : '', webLink(l.website), 'Open')}
       ${contactRow('camera', 'Instagram', l.instagram ? '@' + l.instagram : '', l.instagram ? `https://instagram.com/${l.instagram}` : '', 'View')}
+      ${l.segment === 'web3' || l.x_handle ? contactRow('x', 'X (Twitter)', l.x_handle ? '@' + l.x_handle : '', l.x_handle ? `https://x.com/${l.x_handle}` : '', 'Open', 'X opened') : ''}
+      ${l.segment === 'web3' || l.telegram ? contactRow('telegram', 'Telegram', l.telegram ? '@' + l.telegram : '', l.telegram ? `https://t.me/${l.telegram}` : '', 'Message', 'Telegram opened') : ''}
+      ${l.linkedin ? contactRow('linkedin', 'LinkedIn', l.linkedin.replace(/^https?:\/\/(www\.)?linkedin\.com\//, '').replace(/\/$/, ''), /^https?:/.test(l.linkedin) ? l.linkedin : 'https://' + l.linkedin, 'View', 'LinkedIn opened') : ''}
       ${l.facebook ? contactRow('facebook', 'Facebook', l.facebook.replace(/^https?:\/\/(www\.)?/, ''), l.facebook, 'View') : ''}
       ${maps ? contactRow('pin', 'Map', l.city || 'Location', maps, 'Map') : ''}
     </section>
@@ -125,6 +132,25 @@ export async function renderLead(ctx, { id }, view, alive) {
   };
 }
 
+/* ---------- jobs the company posted (Web3) ---------- */
+function hiringCard(l) {
+  const jobs = l.meta?.hiring?.jobs || [];
+  if (!jobs.length) return '';
+  return `<section class="card">
+    <h2>Hiring now</h2>
+    <p class="muted small">Jobs posted in the last 60 days. A marketing or community role means they need that work done now.</p>
+    <ul class="jobs">${jobs.map((j) => `
+      <li><span class="job-main">
+          <strong>${esc(j.title || 'Job')}</strong>
+          <span class="muted small">${esc([j.location, j.posted_at ? timeAgo(j.posted_at) : ''].filter(Boolean).join(' · '))}</span>
+          ${MARKETING_ROLE.test(j.title || '') ? '<span class="tags"><span class="tag job-hot">Marketing role</span></span>' : ''}
+        </span>
+        ${j.url ? `<a class="btn btn-small" href="${esc(j.url)}" target="_blank" rel="noopener">View job</a>` : ''}
+      </li>`).join('')}</ul>
+    <p class="muted small">Jobs from web3.career</p>
+  </section>`;
+}
+
 /* ---------- Won → AUR Desk ---------- */
 async function won(ctx, l) {
   if (l.status === 'won' && l.meta?.desk_client) { location.href = DESK_URL; return; }
@@ -183,6 +209,9 @@ function editContacts(ctx, l) {
       ${f('email', 'Email', l.email, 'email', 'email')}
       ${f('website', 'Website', l.website, 'url', 'url')}
       ${f('instagram', 'Instagram username', l.instagram)}
+      ${f('x', 'X (Twitter) handle', l.x_handle)}
+      ${f('telegram', 'Telegram', l.telegram)}
+      ${f('linkedin', 'LinkedIn page', l.linkedin, 'url', 'url')}
       <div class="sheet-actions">
         <button class="btn btn-primary" type="submit">Save</button>
         <button class="btn btn-ghost" type="button" data-no>Cancel</button>
@@ -195,6 +224,8 @@ function editContacts(ctx, l) {
     const patch = {
       phone: v('phone'), whatsapp: v('whatsapp'), email: v('email') && v('email').toLowerCase(),
       website: v('website'), instagram: v('instagram') && v('instagram').replace(/^@|.*instagram\.com\//g, '').replace(/[/?#].*$/, '').toLowerCase(),
+      x_handle: v('x') && cleanX(v('x')).toLowerCase(), telegram: v('telegram') && cleanTelegram(v('telegram')).toLowerCase(),
+      linkedin: v('linkedin'),
     };
     try { await updateLead(l, patch, 'Contacts edited'); d.close(); toast('Saved'); ctx.rerender(); }
     catch (err) { toast(err.message); }
