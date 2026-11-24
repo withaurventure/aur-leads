@@ -4,7 +4,7 @@ import { esc, icon, LOGO, num, timeAgo, scoreChip, brandTags, loading, fmtTime }
 import { telLink, waLink, noteContact } from '../leadactions.js';
 
 const BRAND_IN = { all: '', studio: '&brand=in.(studio,both)', printing: '&brand=in.(printing,both)' };
-const COLS = 'id,name,category,city,score,score_reason,brand,status,phone,whatsapp,email,next_followup_at';
+const COLS = 'id,name,category,city,tier,score,score_reason,brand,status,phone,whatsapp,email,next_followup_at';
 
 export async function renderHome(ctx, _p, view, alive) {
   const { state } = ctx;
@@ -14,7 +14,7 @@ export async function renderHome(ctx, _p, view, alive) {
   const b = BRAND_IN[state.brand];
   const [s, hot, due] = await Promise.all([
     rpc('app_summary', { p_brand: state.brand }),
-    rest(`v_leads?select=${COLS}&kind=eq.prospect&status=eq.new&or=(phone.not.is.null,whatsapp.not.is.null)${b}&order=score.desc.nullslast,first_seen_at.desc&limit=5`),
+    rest(`v_leads?select=${COLS}&kind=eq.prospect&status=eq.new&score=gte.8&or=(phone.not.is.null,whatsapp.not.is.null)${b}&order=tier.asc.nullslast,score.desc.nullslast,first_seen_at.desc&limit=5`),
     rest(`v_leads?select=${COLS}&kind=eq.prospect&next_followup_at=lte.${new Date().toISOString()}&status=not.in.(won,lost,do_not_contact)${b}&order=next_followup_at.asc&limit=5`),
   ]);
   if (!alive()) return;
@@ -56,8 +56,8 @@ export async function renderHome(ctx, _p, view, alive) {
     ${s.to_review ? `<button class="banner" data-go="review">${icon('merge')}<span><strong>${num(s.to_review)} possible duplicates</strong> to check</span>${icon('right')}</button>` : ''}
 
     <section class="section">
-      <div class="section-head"><h2>Call first</h2><button class="link-btn" data-go="leads:hot">See all</button></div>
-      ${hot.length ? hot.map(leadCard).join('') : '<div class="empty">No uncontacted leads with a phone number right now. The agent keeps looking.</div>'}
+      <div class="section-head"><div><h2>Call first</h2><small class="muted">Prayagraj first, then UP, then big cities</small></div><button class="link-btn" data-go="leads:hot">See all</button></div>
+      ${hot.length ? hot.map(leadCard).join('') : '<div class="empty">No uncontacted hot leads with a phone number right now. The agent keeps looking.</div>'}
     </section>
 
     ${due.length ? `<section class="section">
@@ -82,9 +82,9 @@ export async function renderHome(ctx, _p, view, alive) {
       const [screen, preset] = el.dataset.go.split(':');
       if (screen === 'leads') {
         const f = ctx.state.leadFilters;
-        Object.assign(f, { minScore: 0, city: '', hasPhone: false, status: '', due: false, q: '', sort: 'score', newToday: false });
+        Object.assign(f, { minScore: 0, city: '', hasPhone: false, status: '', due: false, q: '', sort: 'local', newToday: false });
         f.brand = ctx.state.brand === 'all' ? '' : ctx.state.brand;
-        if (preset === 'hot') Object.assign(f, { minScore: 8, status: 'new', hasPhone: true });
+        if (preset === 'hot') Object.assign(f, { minScore: 8, status: 'new', hasPhone: true, sort: 'local' });
         if (preset === 'due') f.due = true;
         if (preset === 'new') Object.assign(f, { newToday: true, sort: 'newest' });
         ctx.tab('leads');

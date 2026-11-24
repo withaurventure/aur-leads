@@ -3,7 +3,7 @@ import { rest, rpc, q, enc } from '../api.js';
 import { esc, icon, num, scoreChip, brandTags, statusTag, loading, emptyBox } from '../ui.js';
 
 const PAGE = 40;
-const COLS = 'id,name,category,city,score,brand,status,phone,whatsapp,email,website,instagram,next_followup_at';
+const COLS = 'id,name,category,city,tier,score,brand,status,phone,whatsapp,email,website,instagram,next_followup_at';
 let cities = null;
 
 export function buildQuery(f, offset = 0) {
@@ -23,7 +23,7 @@ export function buildQuery(f, offset = 0) {
     and.push(`or(name.ilike.${v},category.ilike.${v},phone.ilike.${v},email.ilike.${v},city.ilike.${v})`);
   }
   if (and.length) p.push(`and=(${enc(and.join(','))})`);
-  const order = { score: 'score.desc.nullslast,first_seen_at.desc', newest: 'first_seen_at.desc', name: 'name.asc', followup: 'next_followup_at.asc.nullslast' }[f.sort] || 'score.desc.nullslast';
+  const order = { local: 'tier.asc.nullslast,score.desc.nullslast,first_seen_at.desc', score: 'score.desc.nullslast,tier.asc.nullslast,first_seen_at.desc', newest: 'first_seen_at.desc', name: 'name.asc', followup: 'next_followup_at.asc.nullslast' }[f.sort] || 'tier.asc.nullslast,score.desc.nullslast';
   p.push(`order=${order}`, `limit=${PAGE}`, `offset=${offset}`);
   return 'v_leads?' + p.join('&');
 }
@@ -62,7 +62,7 @@ export async function renderLeads(ctx, _p, view, alive) {
       </label>
       <label class="select-wrap"><span class="sr-only">Sort</span>
         <select id="sort">
-          ${[['score', 'Best score'], ['newest', 'Newest'], ['name', 'Name A–Z'], ['followup', 'Follow-up date']].map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['local', 'Prayagraj first'], ['score', 'Best score'], ['newest', 'Newest'], ['name', 'Name A–Z'], ['followup', 'Follow-up date']].map(([v, l]) => `<option value="${v}" ${f.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </label>
     </div>
