@@ -76,7 +76,8 @@ export async function renderLead(ctx, { id }, view, alive) {
       <p class="muted small">First found ${esc(fmtDate(l.first_seen_at))}${l.source ? ` via ${esc(l.source)}` : ''}</p>
     </section>
 
-    <button class="btn btn-ghost btn-block danger-text" data-dnc>${icon('ban')}${l.status === 'do_not_contact' ? 'Allow contact again' : 'Do not contact'}</button>
+    <button class="btn btn-ghost btn-block" data-govt>${icon('ban')}Government body: hide this lead</button>
+    <button class="btn btn-ghost btn-block danger-text mt" data-dnc>${icon('ban')}${l.status === 'do_not_contact' ? 'Allow contact again' : 'Do not contact'}</button>
 
     <div class="action-bar">
       <button class="btn btn-primary" data-pitch ${l.status === 'do_not_contact' ? 'disabled' : ''}>${icon('file')}Create pitch</button>
@@ -116,6 +117,12 @@ export async function renderLead(ctx, { id }, view, alive) {
     catch (e) { toast(e.message); }
   };
   view.querySelector('[data-won]').onclick = () => won(ctx, l);
+  view.querySelector('[data-govt]').onclick = async () => {
+    const ok = await confirmBox({ title: 'Hide as a government body?', text: 'Orders from government bodies come through GeM tenders, so this lead leaves your lists. You can bring it back from Review → Hidden as government.', ok: 'Hide it' });
+    if (!ok) return;
+    try { await updateLead(l, { excluded: 'government (marked by you)', is_hidden: true }, 'Hidden as a government body'); toast('Hidden'); ctx.back(); }
+    catch (e) { toast(e.message); }
+  };
 }
 
 /* ---------- Won → AUR Desk ---------- */

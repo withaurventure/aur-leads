@@ -1,6 +1,6 @@
 // AUR Leads — service worker: the app opens instantly and works without internet
 // (lead data still needs internet). Bump VERSION whenever you upload new files.
-const VERSION = 'aur-leads-v2';
+const VERSION = 'aur-leads-v3';
 const FILES = [
   './', 'index.html', 'css/app.css', 'manifest.webmanifest',
   'js/app.js', 'js/config.js', 'js/api.js', 'js/store.js', 'js/ui.js', 'js/brands.js',

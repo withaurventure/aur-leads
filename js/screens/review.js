@@ -8,17 +8,20 @@ export async function renderReview(ctx, _p, view, alive) {
   view.innerHTML = `
     <header class="page-head plain"><div class="page-head-text"><h1>Review duplicates</h1><small>Checked every Sunday night</small></div></header>
     <div id="list">${loading()}</div>`;
-  const [pairs, merged] = await Promise.all([
+  const [pairs, merged, excluded] = await Promise.all([
     rest(`duplicate_candidates?status=eq.pending&select=id,similarity,reason,a:leads!duplicate_candidates_lead_a_fkey(${SIDE}),b:leads!duplicate_candidates_lead_b_fkey(${SIDE})&order=similarity.desc.nullslast&limit=50`),
     rest('v_merged?select=id&limit=1000'),
+    rest('v_excluded?select=id&limit=1', { count: true }),
   ]);
   if (!alive()) return;
   const list = view.querySelector('#list');
   const head = `<p class="info">Leads with the same phone, email, website or map listing are merged automatically. These look alike but need your call. A merge keeps all notes and history, and you can undo it.</p>`;
-  const foot = `<button class="btn btn-ghost btn-block" data-merged>${icon('undo')}Recently merged (${merged.length}): see and undo</button>`;
+  const foot = `<button class="btn btn-ghost btn-block" data-merged>${icon('undo')}Recently merged (${merged.length}): see and undo</button>
+    <button class="btn btn-ghost btn-block mt" data-excluded>${icon('ban')}Hidden as government (${excluded.total}): see and restore</button>`;
   list.innerHTML = head + (pairs.length ? pairs.map(pair).join('') : emptyBox('Nothing to review. Nice and tidy.')) + foot;
 
   list.querySelector('[data-merged]').onclick = () => ctx.go('merged');
+  list.querySelector('[data-excluded]').onclick = () => ctx.go('excluded');
   list.querySelectorAll('[data-merge]').forEach((b) => {
     b.onclick = async () => {
       const p = pairs.find((x) => String(x.id) === b.dataset.merge);
@@ -96,6 +99,26 @@ export async function renderMerged(ctx, _p, view, alive) {
       if (!ok) return;
       try { await rpc('unmerge_lead', { p_drop: b.dataset.undo }); toast('Merge undone'); ctx.rerender(); }
       catch (e) { toast(e.message); }
+    };
+  });
+}
+
+export async function renderExcluded(ctx, _p, view, alive) {
+  view.innerHTML = pageHeader('Hidden as government') + loading();
+  const rows = await rest('v_excluded?select=*&order=city.asc,name.asc&limit=300');
+  if (!alive()) return;
+  view.innerHTML = pageHeader('Hidden as government', { sub: 'Their orders come through GeM tenders' }) +
+    '<p class="info">Hidden automatically by name (Govt, Rajkiya, Zila, CHC, PHC, SRN, Kendriya Vidyalaya…) or because the map lists them as government. Restore any that are actually private.</p>' +
+    (rows.length ? `<div class="rows">${rows.map((r) => `
+      <div class="row static">
+        <span class="row-main"><strong>${esc(r.name)}</strong><span class="muted small">${esc([r.category, r.city].filter(Boolean).join(' · '))} · ${esc(r.excluded)}</span></span>
+        <button class="btn btn-small" data-restore="${r.id}">Restore</button>
+      </div>`).join('')}</div>` : emptyBox('Nothing hidden.'));
+  view.querySelectorAll('[data-restore]').forEach((b) => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await rpc('restore_excluded', { p_id: b.dataset.restore }); toast('Restored to your leads'); ctx.rerender(); }
+      catch (e) { toast(e.message); b.disabled = false; }
     };
   });
 }

@@ -69,9 +69,9 @@ export function scoreChip(n, big = false) {
   const cls = s >= 8 ? 'hot' : s >= 5 ? 'warm' : 'cool';
   return `<span class="score ${cls}${big ? ' big' : ''}" aria-label="Score ${s} out of 10">${s || '–'}</span>`;
 }
-export const BRAND_LABEL = { studio: 'AUR Studio', printing: 'AUR Printing' };
+export const BRAND_LABEL = { studio: 'AUR Studio', printing: 'AUR Printing Studio' };
 export function brandTags(brand, short = false) {
-  const t = (b) => `<span class="tag tag-${b}">${short ? (b === 'studio' ? 'Studio' : 'Printing') : BRAND_LABEL[b]}</span>`;
+  const t = (b) => `<span class="tag tag-${b}">${BRAND_LABEL[b]}</span>`;
   if (brand === 'both') return t('studio') + t('printing');
   return brand ? t(brand) : '';
 }

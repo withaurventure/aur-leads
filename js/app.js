@@ -8,15 +8,18 @@ import { renderLeads } from './screens/leads.js';
 import { renderLead } from './screens/lead.js';
 import { renderPitch } from './screens/pitch.js';
 import { renderTenders } from './screens/tenders.js';
-import { renderReview, renderMerged } from './screens/review.js';
+import { renderReview, renderMerged, renderExcluded } from './screens/review.js';
 import { renderSettings } from './screens/settings.js';
 
 const SCREENS = {
   home: renderHome, leads: renderLeads, lead: renderLead, pitch: renderPitch,
-  tenders: renderTenders, review: renderReview, merged: renderMerged, settings: renderSettings,
+  tenders: renderTenders, review: renderReview, merged: renderMerged, excluded: renderExcluded, settings: renderSettings,
 };
 const TABS = ['home', 'leads', 'tenders', 'review'];
-const AUTO_LOCK_MS = 60 * 1000;
+const AUTO_LOCK_MS = 5 * 60 * 1000;   // locks after 5 minutes in the background
+const UNLOCK_KEY = 'aur-leads-unlocked';
+const markUnlocked = () => { try { sessionStorage.setItem(UNLOCK_KEY, String(Date.now())); } catch { /* ignore */ } };
+const recentlyUnlocked = () => { try { return Date.now() - Number(sessionStorage.getItem(UNLOCK_KEY) || 0) < AUTO_LOCK_MS; } catch { return false; } };
 
 const view = document.getElementById('view');
 let stack = [{ screen: 'home', params: {} }];
@@ -60,7 +63,7 @@ window.addEventListener('popstate', () => {
 async function render() {
   const id = ++renderId;
   const { screen, params } = stack[stack.length - 1];
-  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', merged: 'review', settings: 'home' }[screen] || 'home');
+  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', merged: 'review', excluded: 'review', settings: 'home' }[screen] || 'home');
   document.querySelectorAll('.tab').forEach((t) => (t.dataset.tab === tab ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current')));
   view.scrollTop = 0;
   try {
@@ -110,6 +113,7 @@ function showLogin(message = '') {
         await signIn(form.querySelector('#l-email').value, form.querySelector('#l-pass').value);
         el.hidden = true; el.innerHTML = '';
         if (!(await hasPin())) await runLock('setup');
+        markUnlocked();
         document.body.classList.remove('locked');
         resolve();
         render();
@@ -122,14 +126,18 @@ function showLogin(message = '') {
 }
 
 /* ---------- auto-lock when the app is in the background ---------- */
+// A refresh (or coming back within 5 minutes) does not ask for the PIN again.
 let hiddenAt = 0;
 document.addEventListener('visibilitychange', async () => {
-  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (document.hidden) { hiddenAt = Date.now(); if (!document.body.classList.contains('locked')) markUnlocked(); return; }
   if (hiddenAt && Date.now() - hiddenAt > AUTO_LOCK_MS && (await hasPin()) && !document.body.classList.contains('locked')) {
     await runLock('unlock', { onForgot: ctx.signOut });
   }
+  markUnlocked();
   hiddenAt = 0;
 });
+setInterval(() => { if (!document.hidden && !document.body.classList.contains('locked')) markUnlocked(); }, 30000);
+window.addEventListener('pagehide', () => { if (!document.body.classList.contains('locked')) markUnlocked(); });
 
 /* ---------- start ---------- */
 async function start() {
@@ -139,8 +147,9 @@ async function start() {
   history.replaceState({ depth: 1 }, '');
   const session = await loadSession();
   if (!session) { await showLogin(); return; }
-  if (await hasPin()) await runLock('unlock', { onForgot: ctx.signOut });
-  else await runLock('setup');
+  if (!(await hasPin())) await runLock('setup');
+  else if (!recentlyUnlocked()) await runLock('unlock', { onForgot: ctx.signOut });
+  markUnlocked();
   render();
 }
 
