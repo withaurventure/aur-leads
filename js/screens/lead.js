@@ -138,7 +138,7 @@ function hiringCard(l) {
   if (!jobs.length) return '';
   return `<section class="card">
     <h2>Hiring now</h2>
-    <p class="muted small">Jobs posted in the last 60 days. A marketing or community role means they need that work done now.</p>
+    <p class="muted small">Jobs posted in the last 6 months. A marketing or community role means they need that work done now.</p>
     <ul class="jobs">${jobs.map((j) => `
       <li><span class="job-main">
           <strong>${esc(j.title || 'Job')}</strong>
