@@ -8,14 +8,15 @@ import { cleanX, cleanTelegram } from '../quickadd.js';
 
 const EVENT_LABEL = { found: 'Found', contacts_found: 'Contacts found', new_instagram: 'Instagram found', new_website: 'Website found',
   website_down: 'Website down', rating_changed: 'Rating changed', reviews_up: 'More reviews', status_changed: 'Map listing changed',
-  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', hiring: 'Hiring', you: 'You' };
+  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', hiring: 'Hiring', audit: 'Audit', audit_sent: 'Audit sent', audit_opened: 'Audit opened', you: 'You' };
 const MARKETING_ROLE = /marketing|community|social media|content|growth|brand|\bkol\b|ambassador|\bpr\b|public relations|communications|creative|graphic design|visual design|video editor|influencer|go-to-market|\bgtm\b/i;
 
 export async function renderLead(ctx, { id }, view, alive) {
   view.innerHTML = pageHeader('Lead') + loading();
-  const [rows, events] = await Promise.all([
+  const [rows, events, audits] = await Promise.all([
     rest(`v_leads?id=eq.${enc(id)}&select=*`),
     rest(`lead_events?lead_id=eq.${enc(id)}&select=type,detail,created_at&order=created_at.desc&limit=40`),
+    rest(`audits?lead_id=eq.${enc(id)}&select=sent_via,sent_at,open_count,first_opened_at,last_opened_at,data&order=created_at.desc&limit=1`).catch(() => []),
   ]);
   if (!alive()) return;
   const l = rows[0];
@@ -49,6 +50,7 @@ export async function renderLead(ctx, { id }, view, alive) {
       <ul class="checks">${reasons.map((r) => `<li>${icon('check')}<span>${esc(r)}</span></li>`).join('')}</ul>
     </section>` : ''}
 
+    ${auditCard(l, audits[0])}
     ${hiringCard(l)}
 
     <section class="card contacts">
@@ -114,6 +116,8 @@ export async function renderLead(ctx, { id }, view, alive) {
 
   view.querySelector('[data-edit]').onclick = () => editContacts(ctx, l);
   view.querySelector('[data-pitch]').onclick = () => ctx.go('pitch', { id: l.id });
+  const au = view.querySelector('[data-audit]');
+  if (au) au.onclick = () => ctx.go('audit', { id: l.id });
   view.querySelector('[data-dnc]').onclick = async () => {
     const off = l.status === 'do_not_contact';
     const ok = await confirmBox(off
@@ -130,6 +134,21 @@ export async function renderLead(ctx, { id }, view, alive) {
     try { await updateLead(l, { excluded: 'government (marked by you)', is_hidden: true }, 'Hidden as a government body'); toast('Hidden'); ctx.back(); }
     catch (e) { toast(e.message); }
   };
+}
+
+/* ---------- online presence audit (AUR Studio leads) ---------- */
+function auditCard(l, a) {
+  const fits = l.segment === 'medical' || l.segment === 'web3' || l.brand === 'studio' || l.brand === 'both';
+  if (!fits || l.status === 'do_not_contact') return '';
+  let line = 'A short, personal report on their website and social media. Sent as a link they can open.';
+  if (a?.sent_at) {
+    line = `Sent ${timeAgo(a.sent_at)} by ${(a.sent_via || []).join(' and ')} · score ${a.data?.score ?? "?"}/10 · `
+      + (a.open_count ? `opened ${a.open_count} ${a.open_count === 1 ? 'time' : 'times'}, last ${timeAgo(a.last_opened_at)}` : 'not opened yet');
+  }
+  return `<section class="card audit-status">
+    <div><strong>Online audit</strong><span class="muted small">${esc(line)}</span></div>
+    <button class="btn btn-small ${a?.sent_at ? '' : 'btn-primary'}" data-audit>${icon('audit')}${a?.sent_at ? 'Open' : 'Make audit'}</button>
+  </section>`;
 }
 
 /* ---------- jobs the company posted (Web3) ---------- */

@@ -109,3 +109,23 @@ export const rpc = (fn, args = {}) => rest(`rpc/${fn}`, { method: 'POST', body: 
 // Value for a filter inside and=(...) / or=(...): quoted so commas and brackets in a search are safe.
 export const q = (v) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 export const enc = encodeURIComponent;
+
+// Call one of your Supabase Edge Functions as the signed-in user (e.g. 'send-audit').
+export async function callFunction(name, body, retried = false) {
+  let r;
+  try {
+    r = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+  } catch {
+    throw new Error(navigator.onLine ? 'Could not reach the server. Try again.' : 'No internet. Connect and try again.');
+  }
+  if (r.status === 401 && !retried) { await refresh(); return callFunction(name, body, true); }
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }
+  if (!r.ok) throw new Error(data?.error || `Server said: ${text.slice(0, 160)}`);
+  return data;
+}

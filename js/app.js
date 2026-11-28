@@ -7,12 +7,13 @@ import { renderHome } from './screens/home.js';
 import { renderLeads } from './screens/leads.js';
 import { renderLead } from './screens/lead.js';
 import { renderPitch } from './screens/pitch.js';
+import { renderAudit } from './screens/audit.js';
 import { renderTenders } from './screens/tenders.js';
 import { renderReview, renderMerged, renderExcluded } from './screens/review.js';
 import { renderSettings } from './screens/settings.js';
 
 const SCREENS = {
-  home: renderHome, leads: renderLeads, lead: renderLead, pitch: renderPitch,
+  home: renderHome, leads: renderLeads, lead: renderLead, pitch: renderPitch, audit: renderAudit,
   tenders: renderTenders, review: renderReview, merged: renderMerged, excluded: renderExcluded, settings: renderSettings,
 };
 const TABS = ['home', 'leads', 'tenders', 'review'];
@@ -63,7 +64,7 @@ window.addEventListener('popstate', () => {
 async function render() {
   const id = ++renderId;
   const { screen, params } = stack[stack.length - 1];
-  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', merged: 'review', excluded: 'review', settings: 'home' }[screen] || 'home');
+  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', audit: 'leads', merged: 'review', excluded: 'review', settings: 'home' }[screen] || 'home');
   document.querySelectorAll('.tab').forEach((t) => (t.dataset.tab === tab ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current')));
   view.scrollTop = 0;
   try {
