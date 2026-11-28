@@ -28,7 +28,7 @@ let renderId = 0;
 // App-wide state shared by screens (filters survive moving between screens)
 const state = {
   brand: 'all',                         // Home switch: all | studio | printing
-  leadFilters: { minScore: 0, city: '', hasPhone: false, brand: '', status: '', due: false, q: '', sort: 'local' },
+  leadFilters: { minScore: 0, city: '', category: '', hasPhone: false, mobile: false, email: false, noSite: false, week: false, ready: false, showAll: false, brand: '', status: '', due: false, q: '', sort: 'local' },
   tenderTab: 'open',
 };
 

@@ -14,7 +14,7 @@ export async function renderHome(ctx, _p, view, alive) {
   const b = BRAND_IN[state.brand];
   const [s, hot, due] = await Promise.all([
     rpc('app_summary', { p_brand: state.brand }),
-    rest(`v_leads?select=${COLS}&kind=eq.prospect&status=eq.new&score=gte.8&or=(phone.not.is.null,whatsapp.not.is.null)${b}&order=tier.asc.nullslast,score.desc.nullslast,first_seen_at.desc&limit=5`),
+    rest(`v_leads?select=${COLS}&kind=eq.prospect&status=eq.new&score=gte.8&chain=is.false&or=(phone.not.is.null,whatsapp.not.is.null)${b}&order=tier.asc.nullslast,score.desc.nullslast,first_seen_at.desc&limit=5`),
     rest(`v_leads?select=${COLS}&kind=eq.prospect&next_followup_at=lte.${new Date().toISOString()}&status=not.in.(won,lost,do_not_contact)${b}&order=next_followup_at.asc&limit=5`),
   ]);
   if (!alive()) return;
@@ -48,7 +48,7 @@ export async function renderHome(ctx, _p, view, alive) {
   view.innerHTML = `${top(state)}
     <div class="kpis">
       ${kpi('New today', num(s.new_today), `${num(s.total)} leads in total`, 'leads:new', true)}
-      ${kpi('Hot leads', num(s.hot), 'score 8–10, not contacted', 'leads:hot')}
+      ${kpi('Hot leads', num(s.hot), 'score 8–10, reachable, not contacted', 'leads:hot')}
       ${kpi('Follow-ups due', num(s.followups_due), 'today or overdue', 'leads:due')}
       ${kpi('Open tenders', num(s.open_tenders), 'AUR Printing', 'tenders')}
     </div>
@@ -82,9 +82,9 @@ export async function renderHome(ctx, _p, view, alive) {
       const [screen, preset] = el.dataset.go.split(':');
       if (screen === 'leads') {
         const f = ctx.state.leadFilters;
-        Object.assign(f, { minScore: 0, city: '', hasPhone: false, status: '', due: false, q: '', sort: 'local', newToday: false });
+        Object.assign(f, { minScore: 0, city: '', category: '', hasPhone: false, mobile: false, email: false, noSite: false, week: false, ready: false, showAll: false, status: '', due: false, q: '', sort: 'local', newToday: false });
         f.brand = ctx.state.brand === 'all' ? '' : ctx.state.brand;
-        if (preset === 'hot') Object.assign(f, { minScore: 8, status: 'new', hasPhone: true, sort: 'local' });
+        if (preset === 'hot') Object.assign(f, { minScore: 8, status: 'new', sort: 'local' });
         if (preset === 'due') f.due = true;
         if (preset === 'new') Object.assign(f, { newToday: true, sort: 'newest' });
         ctx.tab('leads');
