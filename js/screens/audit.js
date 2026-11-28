@@ -3,12 +3,10 @@
 import { rest, rpc, enc, callFunction } from '../api.js';
 import { esc, icon, pageHeader, toast, loading } from '../ui.js';
 import { pitchConfig } from '../brands.js';
-import { buildAudit, allFindings, MANUAL, auditLink, whatsappText, emailContent } from '../audit.js';
+import { buildAudit, allFindings, MANUAL, auditLink, whatsappText, emailContent, prefsFor, newToken } from '../audit.js';
 import { waLink } from '../leadactions.js';
 
-const state = new Map();   // per lead: switched-off findings, ticked checks, last saved audit
-
-const newToken = () => (crypto.randomUUID ? crypto.randomUUID() + crypto.randomUUID() : String(Math.random()).slice(2) + Date.now() + String(Math.random()).slice(2)).replace(/-/g, '').slice(0, 40);
+const saved = new Map();   // per lead: the last saved version of the audit (reused while nothing changes)
 
 export async function renderAudit(ctx, { id }, view, alive) {
   view.innerHTML = pageHeader('Audit') + loading();
@@ -17,8 +15,8 @@ export async function renderAudit(ctx, { id }, view, alive) {
   const lead = rows[0];
   if (!lead) { view.innerHTML = pageHeader('Audit') + '<div class="empty">Lead not found.</div>'; return; }
 
-  let s = state.get(id);
-  if (!s) { s = { off: new Set(), manual: new Set(), saved: null }; state.set(id, s); }
+  const s = prefsFor(id);
+  s.saved = saved.get(id) || null;
   const checks = lead.segment === 'web3' ? MANUAL.web3 : MANUAL.local;
   const current = () => buildAudit(lead, cfg, { off: [...s.off], manual: [...s.manual] });
   const sig = (a) => JSON.stringify({ f: a.findings, p: a.positives, s: a.score });
@@ -79,6 +77,7 @@ export async function renderAudit(ctx, { id }, view, alive) {
     if (s.saved && s.saved.sig === sig(a)) return s.saved;
     const r = await rpc('save_audit', { p: { lead_id: lead.id, brand: 'studio', data: a, token } });
     s.saved = { id: r.id, token: r.token, sig: sig(a) };
+    saved.set(id, s.saved);
     return s.saved;
   }
   const tokenFor = (a) => (s.saved && s.saved.sig === sig(a) ? s.saved.token : newToken());
@@ -103,7 +102,7 @@ export async function renderAudit(ctx, { id }, view, alive) {
         await rpc('mark_audit_sent', { p_id: saved.id, p_via: 'WhatsApp' });
         toast('Audit link sent. You will see when they open it.');
       } catch (e) {
-        s.saved = null;
+        s.saved = null; saved.delete(id);
         toast('The audit link could not be saved. Send it again: ' + e.message);
       }
     };

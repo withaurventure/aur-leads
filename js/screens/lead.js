@@ -1,6 +1,6 @@
 // Lead detail: why it scored, contacts (one tap), status, follow-up, notes, timeline,
 // Create pitch, Won → AUR Desk, Do not contact.
-import { rest, enc } from '../api.js';
+import { rest, rpc, enc } from '../api.js';
 import { esc, icon, scoreChip, brandTags, STATUS, pageHeader, toast, confirmBox, timeAgo, fmtDate, dateInput, loading } from '../ui.js';
 import { telLink, waLink, mailLink, webLink, noteContact, setStatus, updateLead, logEvent } from '../leadactions.js';
 import { sendToDesk, DESK_URL } from '../handoff.js';
@@ -8,15 +8,16 @@ import { cleanX, cleanTelegram } from '../quickadd.js';
 
 const EVENT_LABEL = { found: 'Found', contacts_found: 'Contacts found', new_instagram: 'Instagram found', new_website: 'Website found',
   website_down: 'Website down', rating_changed: 'Rating changed', reviews_up: 'More reviews', status_changed: 'Map listing changed',
-  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', hiring: 'Hiring', audit: 'Audit', audit_sent: 'Audit sent', audit_opened: 'Audit opened', you: 'You' };
+  merged: 'Merged duplicate', unmerged: 'Merge undone', pitch_sent: 'Pitch sent', hiring: 'Hiring', audit: 'Audit', audit_sent: 'Audit sent', audit_opened: 'Audit opened', outreach: 'Message sent', followup_sent: 'Follow-up sent', reply: 'Reply', no_reply: 'No reply', send_failed: 'Not sent', you: 'You' };
 const MARKETING_ROLE = /marketing|community|social media|content|growth|brand|\bkol\b|ambassador|\bpr\b|public relations|communications|creative|graphic design|visual design|video editor|influencer|go-to-market|\bgtm\b/i;
 
 export async function renderLead(ctx, { id }, view, alive) {
   view.innerHTML = pageHeader('Lead') + loading();
-  const [rows, events, audits] = await Promise.all([
+  const [rows, events, audits, outs] = await Promise.all([
     rest(`v_leads?id=eq.${enc(id)}&select=*`),
     rest(`lead_events?lead_id=eq.${enc(id)}&select=type,detail,created_at&order=created_at.desc&limit=40`),
     rest(`audits?lead_id=eq.${enc(id)}&select=sent_via,sent_at,open_count,first_opened_at,last_opened_at,data&order=created_at.desc&limit=1`).catch(() => []),
+    rest(`outreach?lead_id=eq.${enc(id)}&select=id,state,current_step,next_step_at,wa_pending_step,email_to,wa_to,email_ok,replied_at,replied_via,reply_snippet,created_at,steps&order=created_at.desc&limit=1`).catch(() => []),
   ]);
   if (!alive()) return;
   const l = rows[0];
@@ -50,6 +51,7 @@ export async function renderLead(ctx, { id }, view, alive) {
       <ul class="checks">${reasons.map((r) => `<li>${icon('check')}<span>${esc(r)}</span></li>`).join('')}</ul>
     </section>` : ''}
 
+    ${outreachCard(l, outs[0])}
     ${auditCard(l, audits[0])}
     ${hiringCard(l)}
 
@@ -89,7 +91,7 @@ export async function renderLead(ctx, { id }, view, alive) {
     <button class="btn btn-ghost btn-block danger-text mt" data-dnc>${icon('ban')}${l.status === 'do_not_contact' ? 'Allow contact again' : 'Do not contact'}</button>
 
     <div class="action-bar">
-      <button class="btn btn-primary" data-pitch ${l.status === 'do_not_contact' ? 'disabled' : ''}>${icon('file')}Create pitch</button>
+      <button class="btn btn-primary" data-message ${l.status === 'do_not_contact' ? 'disabled' : ''}>${icon('share')}Message</button>
       <button class="btn btn-outline" data-won>${l.status === 'won' ? 'Open AUR Desk' : 'Won → AUR Desk'}${icon('arrow')}</button>
     </div>`;
 
@@ -115,7 +117,17 @@ export async function renderLead(ctx, { id }, view, alive) {
   };
 
   view.querySelector('[data-edit]').onclick = () => editContacts(ctx, l);
-  view.querySelector('[data-pitch]').onclick = () => ctx.go('pitch', { id: l.id });
+  view.querySelectorAll('[data-pitch]').forEach((b) => { b.onclick = () => ctx.go('pitch', { id: l.id }); });
+  view.querySelectorAll('[data-message]').forEach((b) => { b.onclick = () => ctx.go('outreach', { id: l.id }); });
+  const o = outs[0];
+  const act = async (fn, args, ok) => { try { await rpc(fn, args); toast(ok); ctx.rerender(); } catch (e) { toast('Could not save: ' + e.message); } };
+  view.querySelector('[data-o-replied]')?.addEventListener('click', () => act('mark_replied', { p_id: o.id, p_via: 'WhatsApp' }, 'Marked as replied. Follow-ups stopped.'));
+  view.querySelector('[data-o-stop]')?.addEventListener('click', () => act('stop_outreach', { p_id: o.id }, 'Follow-ups stopped'));
+  view.querySelector('[data-o-wa]')?.addEventListener('click', async () => {
+    const text = o.steps?.[o.wa_pending_step]?.wa || '';
+    window.open(`https://wa.me/${o.wa_to}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    act('record_send', { p_id: o.id, p_step: o.wa_pending_step, p_channel: 'whatsapp', p_ok: true }, 'Follow-up sent');
+  });
   const au = view.querySelector('[data-audit]');
   if (au) au.onclick = () => ctx.go('audit', { id: l.id });
   view.querySelector('[data-dnc]').onclick = async () => {
@@ -134,6 +146,42 @@ export async function renderLead(ctx, { id }, view, alive) {
     try { await updateLead(l, { excluded: 'government (marked by you)', is_hidden: true }, 'Hidden as a government body'); toast('Hidden'); ctx.back(); }
     catch (e) { toast(e.message); }
   };
+}
+
+/* ---------- messages and follow-ups ---------- */
+function outreachCard(l, o) {
+  if (l.status === 'do_not_contact') return '';
+  const when = (t) => new Date(t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  if (!o) {
+    return `<section class="card outreach-card">
+      <div class="o-head"><strong>Messages</strong><span class="o-state">Not messaged yet</span></div>
+      <p class="muted small">One tap writes a message for WhatsApp and email (with their audit for AUR Studio leads), then follows up on day 3 and 7 until they reply.</p>
+      <div class="two"><button class="btn btn-primary btn-small" data-message>${icon('share')}Message</button>
+        <button class="btn btn-ghost btn-small" data-pitch>${icon('file')}PDF pitch</button></div>
+    </section>`;
+  }
+  const total = Array.isArray(o.steps) ? o.steps.length : 3;
+  const labels = ['First message', ...Array.from({ length: total - 1 }, (_, i) => `Follow-up ${i + 1}`)];
+  const doneUpTo = o.state === 'replied' || o.state === 'no_reply' || o.state === 'stopped' ? o.current_step : o.current_step;
+  const chans = [o.wa_to && 'WhatsApp', o.email_to && (o.email_ok ? 'email' : 'email (bounced)')].filter(Boolean).join(' + ');
+  const state = {
+    active: o.wa_pending_step != null ? 'WhatsApp follow-up waiting for you' : `Next follow-up ${o.next_step_at ? when(o.next_step_at) : 'soon'}`,
+    replied: `Replied by ${o.replied_via || ''} · ${timeAgo(o.replied_at)}`,
+    no_reply: 'No reply after the follow-ups',
+    stopped: 'Follow-ups stopped',
+  }[o.state];
+  return `<section class="card outreach-card state-${o.state}">
+    <div class="o-head"><strong>Messages</strong><span class="o-state">${esc(state)}</span></div>
+    <ol class="o-steps">${labels.map((t, i) => `<li class="${i <= doneUpTo ? 'done' : ''}">${esc(t)}</li>`).join('')}</ol>
+    <p class="muted small">Started ${when(o.created_at)} by ${esc(chans)}</p>
+    ${o.reply_snippet ? `<blockquote class="reply-quote">“${esc(o.reply_snippet)}”</blockquote>` : ''}
+    ${o.state === 'active' ? `<div class="two">
+        ${o.wa_pending_step != null ? `<button class="btn btn-wa btn-small" data-o-wa>${icon('whatsapp')}Send follow-up</button>` : `<button class="btn btn-outline btn-small" data-o-replied>They replied</button>`}
+        <button class="btn btn-ghost btn-small" data-o-stop>Stop follow-ups</button></div>
+        ${o.wa_pending_step != null ? '<button class="link-btn" data-o-replied>They replied (stop follow-ups)</button>' : ''}`
+      : `<div class="two"><button class="btn btn-primary btn-small" data-message>${icon('share')}Message again</button>
+        <button class="btn btn-ghost btn-small" data-pitch>${icon('file')}PDF pitch</button></div>`}
+  </section>`;
 }
 
 /* ---------- online presence audit (AUR Studio leads) ---------- */

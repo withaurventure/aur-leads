@@ -83,7 +83,7 @@ export function brandTags(brand, short = false) {
   return brand ? t(brand) : '';
 }
 export const STATUS = {
-  new: 'New', contacted: 'Contacted', replied: 'Replied', meeting: 'Meeting',
+  new: 'New', contacted: 'Messaged', no_reply: 'No reply', replied: 'Replied', meeting: 'Meeting',
   proposal_sent: 'Proposal sent', won: 'Won', lost: 'Lost', do_not_contact: 'Do not contact',
 };
 export const statusTag = (s) => (s && s !== 'new' ? `<span class="tag tag-plain">${esc(STATUS[s] || s)}</span>` : '');

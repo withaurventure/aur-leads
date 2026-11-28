@@ -1,6 +1,6 @@
 // Home: business switch, today's numbers, who to call first, follow-ups due, agent status.
 import { rest, rpc } from '../api.js';
-import { esc, icon, LOGO, num, timeAgo, scoreChip, brandTags, loading, fmtTime } from '../ui.js';
+import { esc, icon, LOGO, num, timeAgo, scoreChip, brandTags, loading, fmtTime, toast } from '../ui.js';
 import { telLink, waLink, noteContact } from '../leadactions.js';
 
 const BRAND_IN = { all: '', studio: '&brand=in.(studio,both)', printing: '&brand=in.(printing,both)' };
@@ -12,10 +12,13 @@ export async function renderHome(ctx, _p, view, alive) {
   bindTop(ctx, view);
 
   const b = BRAND_IN[state.brand];
-  const [s, hot, due] = await Promise.all([
+  const week = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [s, hot, due, replies, waq] = await Promise.all([
     rpc('app_summary', { p_brand: state.brand }),
     rest(`v_leads?select=${COLS}&kind=eq.prospect&status=eq.new&score=gte.8&chain=is.false&or=(phone.not.is.null,whatsapp.not.is.null)${b}&order=tier.asc.nullslast,score.desc.nullslast,first_seen_at.desc&limit=5`),
     rest(`v_leads?select=${COLS}&kind=eq.prospect&next_followup_at=lte.${new Date().toISOString()}&status=not.in.(won,lost,do_not_contact)${b}&order=next_followup_at.asc&limit=5`),
+    rest(`v_outreach?state=eq.replied&replied_at=gte.${week}&order=replied_at.desc&limit=5`).catch(() => []),
+    rest(`v_outreach?state=eq.active&wa_pending_step=not.is.null&order=next_step_at.asc&limit=10`).catch(() => []),
   ]);
   if (!alive()) return;
   const all = [...hot, ...due];
@@ -55,6 +58,27 @@ export async function renderHome(ctx, _p, view, alive) {
 
     ${s.to_review ? `<button class="banner" data-go="review">${icon('merge')}<span><strong>${num(s.to_review)} possible duplicates</strong> to check</span>${icon('right')}</button>` : ''}
 
+    ${replies.length ? `<section class="section">
+      <div class="section-head"><div><h2>Replies</h2><small class="muted">They answered. Call or message them now</small></div></div>
+      ${replies.map((r) => `<button class="card reply-card" data-lead="${r.lead_id}">
+        <span class="reply-dot" aria-hidden="true"></span>
+        <span class="row-main"><strong>${esc(r.name)}</strong>
+          <span class="muted small">Replied by ${esc(r.replied_via || '')} · ${esc(timeAgo(r.replied_at))}</span>
+          ${r.reply_snippet ? `<span class="small">“${esc(r.reply_snippet.slice(0, 140))}”</span>` : ''}</span>
+        ${icon('right', 'chev')}</button>`).join('')}
+    </section>` : ''}
+
+    ${waq.length ? `<section class="section">
+      <div class="section-head"><div><h2>WhatsApp follow-ups</h2><small class="muted">Written for you. One tap each</small></div></div>
+      ${waq.map((o) => `<div class="card wa-card">
+        <div class="row-main"><strong>${esc(o.name)}</strong><span class="muted small">Follow-up ${o.wa_pending_step} of ${o.total_steps - 1}${o.city ? ' · ' + esc(o.city) : ''}</span>
+          <span class="small wa-preview">${esc((o.wa_pending_text || '').slice(0, 160))}${(o.wa_pending_text || '').length > 160 ? '…' : ''}</span></div>
+        <div class="two">
+          <button class="btn btn-wa btn-small" data-wa-send="${o.id}">${icon('whatsapp')}Send</button>
+          <button class="btn btn-outline btn-small" data-wa-replied="${o.id}">They replied</button>
+        </div></div>`).join('')}
+    </section>` : ''}
+
     <section class="section">
       <div class="section-head"><div><h2>Call first</h2><small class="muted">Prayagraj first, then UP, then big cities</small></div><button class="link-btn" data-go="leads:hot">See all</button></div>
       ${hot.length ? hot.map(leadCard).join('') : '<div class="empty">No uncontacted hot leads with a phone number right now. The agent keeps looking.</div>'}
@@ -89,6 +113,21 @@ export async function renderHome(ctx, _p, view, alive) {
         if (preset === 'new') Object.assign(f, { newToday: true, sort: 'newest' });
         ctx.tab('leads');
       } else ctx.tab(screen);
+    };
+  });
+  view.querySelectorAll('[data-wa-send]').forEach((btn) => {
+    btn.onclick = async () => {
+      const o = waq.find((x) => x.id === btn.dataset.waSend);
+      if (!o) return;
+      window.open(`https://wa.me/${o.wa_to}?text=${encodeURIComponent(o.wa_pending_text || '')}`, '_blank', 'noopener');
+      try { await rpc('record_send', { p_id: o.id, p_step: o.wa_pending_step, p_channel: 'whatsapp', p_ok: true }); toast('Follow-up sent'); ctx.rerender(); }
+      catch (e) { toast('Could not record it: ' + e.message); }
+    };
+  });
+  view.querySelectorAll('[data-wa-replied]').forEach((btn) => {
+    btn.onclick = async () => {
+      try { await rpc('mark_replied', { p_id: btn.dataset.waReplied, p_via: 'WhatsApp' }); toast('Marked as replied. Follow-ups stopped.'); ctx.rerender(); }
+      catch (e) { toast('Could not save: ' + e.message); }
     };
   });
   view.querySelectorAll('[data-lead]').forEach((el) => { el.onclick = () => ctx.go('lead', { id: el.dataset.lead }); });

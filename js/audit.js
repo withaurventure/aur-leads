@@ -122,6 +122,14 @@ export function buildAudit(lead, cfg, { off = [], manual = [] } = {}) {
 export const allFindings = (lead, manual = []) => rules(lead, Object.fromEntries(manual.map((k) => [k, true])));
 export const auditLink = (token) => `${AUDIT_URL}?t=${token}`;
 
+// Your audit choices per lead (ticks and switched-off findings), shared by the Audit and Send screens
+export const auditPrefs = new Map();
+export const prefsFor = (id) => {
+  if (!auditPrefs.has(id)) auditPrefs.set(id, { off: new Set(), manual: new Set() });
+  return auditPrefs.get(id);
+};
+export const newToken = () => (crypto.randomUUID ? crypto.randomUUID() + crypto.randomUUID() : String(Math.random()).slice(2) + Date.now() + String(Math.random()).slice(2)).replace(/-/g, '').slice(0, 40);
+
 export function whatsappText(lead, audit, link, cfg) {
   const top = audit.findings[0]?.title?.toLowerCase();
   const n = audit.findings.length;

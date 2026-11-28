@@ -284,3 +284,25 @@ textarea { resize: vertical; line-height: 1.45; }
 .plain-list li { display: flex; gap: 8px; align-items: flex-start; padding: 4px 0; font-size: 14px; }
 .audit-status { display: flex; align-items: center; gap: 12px; }
 .audit-status > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- messages & follow-ups ---------- */
+.notice { background: #FFF5D6; color: #6B5200; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin-bottom: 12px; }
+.pad { padding: 0 4px; }
+.step-card textarea, .step-card input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px; font: inherit; font-size: 14px; font-weight: 400; background: #fff; }
+.step-card input { height: 42px; }
+.outreach-card .o-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.outreach-card .o-state { font-size: 13px; font-weight: 600; color: var(--teal); text-align: right; }
+.outreach-card.state-replied .o-state { color: #1F8F4E; }
+.outreach-card.state-no_reply .o-state, .outreach-card.state-stopped .o-state { color: var(--muted); }
+.o-steps { list-style: none; display: flex; gap: 6px; padding: 0; margin: 12px 0 6px; }
+.o-steps li { flex: 1; font-size: 11px; text-align: center; color: var(--muted); padding-top: 10px; border-top: 4px solid var(--line); }
+.o-steps li.done { color: var(--teal); border-top-color: var(--teal); font-weight: 600; }
+.reply-quote { margin: 8px 0; padding: 8px 12px; border-left: 3px solid #1F8F4E; background: #EEF8F2; border-radius: 0 8px 8px 0; font-size: 14px; }
+.outreach-card .two, .wa-card .two { display: flex; gap: 8px; margin-top: 10px; }
+.outreach-card .two .btn, .wa-card .two .btn { flex: 1; }
+.reply-card { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; border: 1px solid #BFE5CF; background: #F3FBF6; margin-bottom: 8px; }
+.reply-dot { width: 10px; height: 10px; border-radius: 50%; background: #1F8F4E; flex-shrink: 0; }
+.wa-card { margin-bottom: 8px; }
+.wa-card .row-main { display: flex; flex-direction: column; gap: 3px; }
+.wa-preview { color: #33413C; background: #F1F5F3; border-radius: 8px; padding: 6px 8px; margin-top: 4px; }
+.plain-list li span small { color: var(--muted); }
