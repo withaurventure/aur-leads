@@ -148,7 +148,7 @@ function top(state) {
         <h1>AUR <span>Leads</span></h1>
         <small><span class="live-dot" aria-hidden="true"></span>Agent runs every 20 minutes · ${esc(fmtTime(new Date().toISOString()))}</small>
       </div>
-      <button class="icon-btn" data-search aria-label="Search leads">${icon('search')}</button>
+      <button class="icon-btn bell" data-alerts aria-label="Alerts">${icon('bell')}<span class="bell-count" id="bell-count" hidden></span></button>
       <button class="icon-btn" data-settings aria-label="Settings">${icon('gear')}</button>
     </header>
     <div class="segmented" role="tablist" aria-label="Business">
@@ -160,4 +160,12 @@ function bindTop(ctx, view) {
   view.querySelectorAll('[data-brand]').forEach((b) => { b.onclick = () => { ctx.state.brand = b.dataset.brand; ctx.rerender(); }; });
   const s = view.querySelector('[data-search]'); if (s) s.onclick = () => ctx.tab('leads');
   const g = view.querySelector('[data-settings]'); if (g) g.onclick = () => ctx.go('settings');
+  const a = view.querySelector('[data-alerts]');
+  if (a) {
+    a.onclick = () => ctx.go('alerts');
+    rest('notifications?select=id&read_at=is.null', { count: true }).then(({ total }) => {
+      const el = view.querySelector('#bell-count');
+      if (el && total) { el.textContent = total > 9 ? '9+' : String(total); el.hidden = false; }
+    }).catch(() => {});
+  }
 }

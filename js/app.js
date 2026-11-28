@@ -9,15 +9,17 @@ import { renderLead } from './screens/lead.js';
 import { renderPitch } from './screens/pitch.js';
 import { renderAudit } from './screens/audit.js';
 import { renderOutreach } from './screens/outreach.js';
+import { renderContacted } from './screens/contacted.js';
+import { renderAlerts, openTarget } from './screens/alerts.js';
 import { renderTenders } from './screens/tenders.js';
 import { renderReview, renderMerged, renderExcluded } from './screens/review.js';
 import { renderSettings } from './screens/settings.js';
 
 const SCREENS = {
-  home: renderHome, leads: renderLeads, lead: renderLead, pitch: renderPitch, audit: renderAudit, outreach: renderOutreach,
+  home: renderHome, leads: renderLeads, lead: renderLead, pitch: renderPitch, audit: renderAudit, outreach: renderOutreach, contacted: renderContacted, alerts: renderAlerts,
   tenders: renderTenders, review: renderReview, merged: renderMerged, excluded: renderExcluded, settings: renderSettings,
 };
-const TABS = ['home', 'leads', 'tenders', 'review'];
+const TABS = ['home', 'leads', 'contacted', 'tenders', 'review'];
 const AUTO_LOCK_MS = 5 * 60 * 1000;   // locks after 5 minutes in the background
 const UNLOCK_KEY = 'aur-leads-unlocked';
 const markUnlocked = () => { try { sessionStorage.setItem(UNLOCK_KEY, String(Date.now())); } catch { /* ignore */ } };
@@ -65,7 +67,7 @@ window.addEventListener('popstate', () => {
 async function render() {
   const id = ++renderId;
   const { screen, params } = stack[stack.length - 1];
-  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', audit: 'leads', outreach: 'leads', merged: 'review', excluded: 'review', settings: 'home' }[screen] || 'home');
+  const tab = TABS.includes(screen) ? screen : ({ lead: 'leads', pitch: 'leads', audit: 'leads', outreach: 'leads', alerts: 'home', merged: 'review', excluded: 'review', settings: 'home' }[screen] || 'home');
   document.querySelectorAll('.tab').forEach((t) => (t.dataset.tab === tab ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current')));
   view.scrollTop = 0;
   try {
@@ -152,6 +154,9 @@ async function start() {
   if (!(await hasPin())) await runLock('setup');
   else if (!recentlyUnlocked()) await runLock('unlock', { onForgot: ctx.signOut });
   markUnlocked();
+  // opened from a phone alert?
+  const open = new URLSearchParams(location.search).get('open');
+  if (open) { history.replaceState({ depth: 1 }, '', location.pathname); openTarget(ctx, open); return; }
   render();
 }
 
@@ -159,6 +164,9 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => {}));
   let reloaded = false;
   const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type === 'open' && !document.body.classList.contains('locked')) openTarget(ctx, e.data.url);
+  });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (hadController && !reloaded) { reloaded = true; toast('AUR Leads updated'); }
   });

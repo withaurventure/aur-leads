@@ -11,8 +11,9 @@ let categories = null;
 export function buildQuery(f, offset = 0) {
   const p = [`select=${COLS}`, 'kind=eq.prospect'];
   const and = [];
-  // Default: only leads worth your time: reachable, not a big chain, not marked do-not-contact
-  if (!f.showAll) p.push('reachable=is.true', 'chain=is.false', 'status=neq.do_not_contact');
+  // Default: only leads worth your time that you have NOT contacted yet (contacted ones live in the Contacted tab)
+  if (!f.showAll) p.push('reachable=is.true', 'chain=is.false');
+  if (!f.showAll && !f.due) p.push('status=eq.new');
   if (f.ready) p.push('has_mobile=is.true', 'status=eq.new', 'score=gte.6');
   if (f.mobile) p.push('has_mobile=is.true');
   if (f.email) p.push('email=not.is.null');
@@ -67,7 +68,6 @@ export async function renderLeads(ctx, _p, view, alive) {
       ${chip('email', 'Has email', f.email)}
       ${chip('nosite', 'No website', f.noSite)}
       ${chip('week', 'New this week', f.week)}
-      ${chip('new', 'Not contacted', f.status === 'new')}
       ${chip('studio', 'Studio', f.brand === 'studio')}
       ${chip('printing', 'Printing', f.brand === 'printing')}
       ${chip('web3', 'Web3', f.web3)}
@@ -99,7 +99,7 @@ export async function renderLeads(ctx, _p, view, alive) {
     rows = append ? rows.concat(res.rows) : res.rows;
     view.querySelector('#total').textContent = f.showAll
       ? `${num(res.total)} ${res.total === 1 ? 'lead' : 'leads'} (all)`
-      : `${num(res.total)} worth contacting`;
+      : `${num(res.total)} not contacted yet`;
     const box = view.querySelector('#rows');
     box.innerHTML = rows.length ? rows.map(row).join('') : emptyBox('No leads match. Try removing a filter.');
     const more = view.querySelector('#more');

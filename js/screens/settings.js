@@ -4,6 +4,7 @@ import { esc, icon, pageHeader, toast, confirmBox, loading } from '../ui.js';
 import { pitchConfig, savePitchConfig } from '../brands.js';
 import { runLock, bioAvailable, bioEnabled, enableBio, disableBio } from '../security/lock.js';
 import { DESK_URL } from '../handoff.js';
+import { pushState, enablePush, disablePush, sendTestAlert } from '../push.js';
 
 export const APP_VERSION = '1.0';
 
@@ -27,8 +28,21 @@ export async function renderSettings(ctx, _p, view, alive) {
     </section>`;
   };
 
+  const ps = await pushState().catch(() => 'unsupported');
+  if (!alive()) return;
+  const pushText = { on: 'On for this phone. Replies, audit opens, WhatsApp follow-ups, good tenders, a 9 am summary and problems will reach you, even when the app is closed. Quiet from 10 pm to 7:30 am.',
+    off: 'Get replies, audit opens, WhatsApp follow-ups, good tenders, a 9 am summary and problems as phone notifications, even when the app is closed.',
+    blocked: 'Notifications are blocked for this site. In Chrome: tap the lock icon next to the address → Permissions → Notifications → Allow, then come back.',
+    unsupported: 'This browser cannot show app notifications. Open AUR Leads in Chrome on Android and add it to the home screen.' }[ps];
   view.innerHTML = `
     ${pageHeader('Settings')}
+    <section class="card">
+      <h2>Phone alerts</h2>
+      <p class="small">${esc(pushText)}</p>
+      ${ps === 'on' ? `<div class="two"><button class="btn btn-outline" data-push-test>${icon('bell')}Send a test</button><button class="btn btn-ghost" data-push-off>Turn off</button></div>`
+        : ps === 'off' ? `<button class="btn btn-primary btn-block" data-push-on>${icon('bell')}Turn on phone alerts</button>` : ''}
+      <button class="list-btn" data-alerts-list>${icon('bell')}<span>See all alerts</span>${icon('right', 'chev')}</button>
+    </section>
     <form id="pitch-form" novalidate>
       <section class="card">
         <h2>Pitch sender</h2>
@@ -72,6 +86,17 @@ export async function renderSettings(ctx, _p, view, alive) {
     if (!next.studio.services.length || !next.printing.services.length) { toast('Keep at least one service for each brand'); return; }
     try { await savePitchConfig(next); toast('Pitch settings saved'); } catch (err) { toast(err.message); }
   };
+  const on = view.querySelector('[data-push-on]');
+  if (on) on.onclick = async () => {
+    on.disabled = true; on.textContent = 'Turning on…';
+    try { await enablePush(); await sendTestAlert(); toast('Alerts are on. A test is on its way.'); ctx.rerender(); }
+    catch (e) { toast(e.message); on.disabled = false; on.textContent = 'Turn on phone alerts'; }
+  };
+  const off = view.querySelector('[data-push-off]');
+  if (off) off.onclick = async () => { await disablePush(); toast('Phone alerts turned off'); ctx.rerender(); };
+  const test = view.querySelector('[data-push-test]');
+  if (test) test.onclick = async () => { try { await sendTestAlert(); toast('Test sent. It should arrive in a few seconds.'); } catch (e) { toast(e.message); } };
+  view.querySelector('[data-alerts-list]').onclick = () => ctx.go('alerts');
   view.querySelector('[data-pin]').onclick = async () => { if (await runLock('change')) toast('PIN changed'); };
   const bio = view.querySelector('[data-bio]');
   if (bio) bio.onchange = async () => {

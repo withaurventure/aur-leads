@@ -306,3 +306,26 @@ textarea { resize: vertical; line-height: 1.45; }
 .wa-card .row-main { display: flex; flex-direction: column; gap: 3px; }
 .wa-preview { color: #33413C; background: #F1F5F3; border-radius: 8px; padding: 6px 8px; margin-top: 4px; }
 .plain-list li span small { color: var(--muted); }
+
+/* ---------- contacted & alerts ---------- */
+.chip b { font-weight: 700; margin-left: 4px; opacity: .7; }
+.stage-tag { color: #33413C; background: #E6EAE8; }
+.stage-tag.stage-replied { color: #155E37; background: #DDF3E6; }
+.stage-tag.stage-waiting { color: #6B5200; background: #FFF1C7; }
+.stage-tag.stage-no_reply { color: #5b6663; background: #ECEEED; }
+.stage-tag.stage-meeting, .stage-tag.stage-proposal { color: #1F3373; background: #E6ECFF; }
+.stage-tag.stage-won { color: #fff; background: #1F8F4E; }
+.stage-tag.stage-lost { color: #8A2A1B; background: #FBE5E1; }
+.bell { position: relative; }
+.bell-count { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; border-radius: 9px; background: #D9412B; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; }
+.bell-count[hidden] { display: none; }
+.alert-row { align-items: flex-start; }
+.alert-row .row-main { gap: 3px; }
+.alert-row.unread { background: #F2F8F5; }
+.alert-ic { width: 36px; height: 36px; border-radius: 10px; background: #E6EAE8; display: grid; place-items: center; flex-shrink: 0; }
+.alert-ic svg { width: 18px; height: 18px; }
+.kind-reply .alert-ic { background: #DDF3E6; color: #155E37; }
+.kind-problem .alert-ic { background: #FBE5E1; color: #8A2A1B; }
+.kind-tender .alert-ic { background: #E6ECFF; color: #1F3373; }
+.kind-audit .alert-ic { background: #ECEAF5; color: #2C2B6E; }
+.tabbar .tab span { font-size: 11px; }
